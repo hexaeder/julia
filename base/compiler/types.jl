@@ -32,6 +32,15 @@ struct StmtInfo
     used::Bool
 end
 
+struct MethodInfo
+    propagate_inbounds::Bool
+    method_for_inference_limit_heuristics::Union{Nothing,Method}
+end
+function MethodInfo(src::CodeInfo)
+    return MethodInfo(src.propagate_inbounds,
+        src.method_for_inference_limit_heuristics::Union{Nothing,Method})
+end
+
 """
     v::VarState
 
@@ -471,6 +480,9 @@ interpretation. `NativeInterpreter` uses this interface to switch its lattice to
 """
 switch_to_irinterp(interp::AbstractInterpreter) = interp
 switch_to_irinterp(interp::NativeInterpreter) = NativeInterpreter(interp; irinterp=true)
+
+switch_from_irinterp(irinterp::AbstractInterpreter) = irinterp
+switch_from_irinterp(irinterp::NativeInterpreter) = NativeInterpreter(irinterp; irinterp=false)
 
 abstract type CallInfo end
 
