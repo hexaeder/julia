@@ -1921,7 +1921,7 @@ typedef struct _jl_task_t {
     jl_function_t *start;
     // 4 byte padding on 32-bit systems
     // uint32_t padding0;
-    uint64_t rngState[4];
+    uint64_t rngState[6]; // xoshiro 4 + splitmix 2
     _Atomic(uint8_t) _state;
     uint8_t sticky; // record whether this Task can be migrated to a new thread
     _Atomic(uint8_t) _isexception; // set if `result` is an exception to throw or that we exited with
@@ -1929,7 +1929,6 @@ typedef struct _jl_task_t {
     // uint8_t padding1;
     // multiqueue priority
     uint16_t priority;
-
 // hidden state:
     // id of owning thread - does not need to be defined until the task runs
     _Atomic(int16_t) tid;

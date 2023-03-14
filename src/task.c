@@ -866,28 +866,34 @@ uint64_t jl_genrandom(uint64_t rngState[4]) JL_NOTSAFEPOINT
     return res;
 }
 
-void jl_rng_split(uint64_t to[4], uint64_t from[4]) JL_NOTSAFEPOINT
+// pcg_out = pcg_output_rxs_m_xs_64_64 from
+// https://github.com/imneme/pcg-c/blob/83252d9c23df9c82ecb42210afed61a7b42402d7/include/pcg_variants.h#L188-L193
+//
+// This is the best statistical output function of the PCG family; it produces
+// statistically good output even in the case when the state and output are the
+// same size, in this case both being 64 bits.
+//
+inline uint64_t pcg_out(uint64_t x)
 {
-    /* TODO: consider a less ad-hoc construction
-       Ideally we could just use the output of the random stream to seed the initial
-       state of the child. Out of an overabundance of caution we multiply with
-       effectively random coefficients, to break possible self-interactions.
+    int s = x >> 59;
+    x ^= x >> (s + 5);
+    x *= 0xaef17502108ef2d9;
+    return x ^ (x >> 43);
+}
 
-       It is not the goal to mix bits -- we work under the assumption that the
-       source is well-seeded, and its output looks effectively random.
-       However, xoshiro has never been studied in the mode where we seed the
-       initial state with the output of another xoshiro instance.
+const uint64_t LCG_MUL = 0xd1342543de82ef95; // https://arxiv.org/abs/2001.05304
 
-       Constants have nothing up their sleeve:
-       0x02011ce34bce797f == hash(UInt(1))|0x01
-       0x5a94851fb48a6e05 == hash(UInt(2))|0x01
-       0x3688cf5d48899fa7 == hash(UInt(3))|0x01
-       0x867b4bb4c42e5661 == hash(UInt(4))|0x01
-    */
-    to[0] = 0x02011ce34bce797f * jl_genrandom(from);
-    to[1] = 0x5a94851fb48a6e05 * jl_genrandom(from);
-    to[2] = 0x3688cf5d48899fa7 * jl_genrandom(from);
-    to[3] = 0x867b4bb4c42e5661 * jl_genrandom(from);
+void jl_rng_split(uint64_t dst[6], uint64_t src[6]) JL_NOTSAFEPOINT
+{
+    uint64_t lcg = src[4] * LCG_MUL + 1;  // advance PCG's LCG state
+    uint64_t dot = src[5] + pcg_out(lcg); // update splitmix dot product
+    uint64_t mul = pcg_out(dot) | 1;      // state multiplier (odd)
+    dst[0] = mul * src[1]; // we multiply here because:
+    dst[1] = mul * src[2]; // 1. guarantees not accidentally hitting all zeros state
+    dst[2] = mul * src[3]; // 2. multiply is highly non-commutive with the ops that
+    dst[3] = mul * src[0]; // xoshiro uses internally & result should be uncorrelated
+    dst[4] = src[4] = lcg; // LCG advances in both child and parent
+    dst[5] = dot;          // dot product is modified in child only
 }
 
 JL_DLLEXPORT jl_task_t *jl_new_task(jl_function_t *start, jl_value_t *completion_future, size_t ssize)
