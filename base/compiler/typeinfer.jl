@@ -787,7 +787,12 @@ function merge_call_chain!(interp::AbstractInterpreter, parent::InferenceState, 
         merge_effects!(interp, child, Effects(EFFECTS_TOTAL; terminates=false))
         child = parent
         child === ancestor && break
-        parent = child.parent::InferenceState
+        parent = child.parent
+        # XXX we should implement a proper recursion detection for `IRInterpretationState`
+        while isa(parent, IRInterpretationState)
+            parent = parent.parent
+        end
+        parent = parent::InferenceState
     end
 end
 

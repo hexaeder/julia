@@ -502,7 +502,8 @@ function add_call_backedges!(interp::AbstractInterpreter, @nospecialize(rettype)
         if !isoverlayed(method_table(interp))
             all_effects = Effects(all_effects; nonoverlayed=false)
         end
-        if (# ignore the `:noinbounds` property if `:consistent`-cy is tainted already
+        if isa(sv, InferenceState) && (
+            # ignore the `:noinbounds` property if `:consistent`-cy is tainted already
             sv.ipo_effects.consistent === ALWAYS_FALSE || all_effects.consistent === ALWAYS_FALSE ||
             # or this `:noinbounds` doesn't taint it
             !stmt_taints_inbounds_consistency(sv))
@@ -562,7 +563,7 @@ function abstract_call_method(interp::AbstractInterpreter, method::Method, @nosp
             end
             topmost === nothing || continue
             if edge_matches_sv(interp, sv′, method, sig, sparams, hardlimit, sv)
-                topmost = infstate
+                topmost = sv′
                 edgecycle = true
             end
         end
@@ -608,10 +609,12 @@ function abstract_call_method(interp::AbstractInterpreter, method::Method, @nosp
                 return MethodCallResult(Any, true, true, nothing, Effects())
             end
             add_remark!(interp, sv, washardlimit ? RECURSION_MSG_HARDLIMIT : RECURSION_MSG)
-            topmost = topmost::InferenceState
-            parentframe = topmost.parent
-            if isa(sv, InferenceState) && isa(parentframe, InferenceState)
-                poison_callstack!(sv, parentframe === nothing ? topmost : parentframe)
+            # XXX this is very dangerous
+            if isa(topmost, InferenceState)
+                parentframe = frame_parent(topmost)
+                if isa(sv, InferenceState) && isa(parentframe, InferenceState)
+                    poison_callstack!(sv, parentframe === nothing ? topmost : parentframe)
+                end
             end
             sig = newsig
             sparams = svec()
