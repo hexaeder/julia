@@ -885,15 +885,15 @@ const uint64_t LCG_MUL = 0xd1342543de82ef95; // https://arxiv.org/abs/2001.05304
 
 void jl_rng_split(uint64_t dst[6], uint64_t src[6]) JL_NOTSAFEPOINT
 {
-    uint64_t lcg = src[4] * LCG_MUL + 1;  // advance PCG's LCG state
+    uint64_t lcg = src[4];                // load internal PCG's LCG state
     uint64_t dot = src[5] + pcg_out(lcg); // update splitmix dot product
-    uint64_t mul = pcg_out(dot) | 1;      // state multiplier (odd)
+    uint64_t mul = pcg_out(dot) | 1;      // state multiplier (odd ∴ invertible)
     dst[0] = mul * src[1]; // we multiply here because:
     dst[1] = mul * src[2]; // 1. guarantees not accidentally hitting all zeros state
-    dst[2] = mul * src[3]; // 2. multiply is highly non-commutive with the ops that
-    dst[3] = mul * src[0]; // xoshiro uses internally & result should be uncorrelated
-    dst[4] = src[4] = lcg; // LCG advances in both child and parent
-    dst[5] = dot;          // dot product is modified in child only
+    dst[2] = mul * src[3]; // 2. multiply is fairly non-commutive with ops xoshiro
+    dst[3] = mul * src[0]; //    stepping uses so the result should be uncorrelated
+    dst[4] = src[4] = lcg * LCG_MUL + 1;  // LCG advances in both child and parent
+    dst[5] = dot;                         // dot product modified in child only
 }
 
 JL_DLLEXPORT jl_task_t *jl_new_task(jl_function_t *start, jl_value_t *completion_future, size_t ssize)
