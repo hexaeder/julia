@@ -3505,12 +3505,19 @@ f(x) = yt(x)
       (let* ((left (if (or (atom? t) (ssavalue? t) (quoted? t))
                        #f
                        (make-ssavalue)))
+             (temp (if (or (atom? rhs) (ssavalue? rhs) (quoted? rhs))
+                       #f
+                       (make-ssavalue)))
              (ty   (or left t))
-             (ex   `(call (top convert) ,ty ,rhs))
-             (ex   (if assert `(call (core typeassert) ,ex ,ty) ex)))
-        (if left
-            `(block (= ,left ,(renumber-assigned-ssavalues t)) ,ex)
-            ex))))
+             (val  (or temp rhs))
+             (ex   `(call (top convert) ,ty ,val))
+             (ex   (if assert `(call (core typeassert) ,ex ,ty) ex))
+             (ex   `(if (call (core isa) ,val ,ty) ,val ,ex))
+             (t    (if left (renumber-assigned-ssavalues t) t)))
+        (cond ((and left temp) `(block (= ,left ,t) (= ,temp ,rhs) ,ex))
+              (left `(block (= ,left ,t) ,ex))
+              (temp `(block (= ,temp ,rhs) ,ex))
+              (else ex)))))
 
 (define (capt-var-access var fname opaq)
   (if opaq
