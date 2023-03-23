@@ -887,13 +887,15 @@ void jl_rng_split(uint64_t dst[6], uint64_t src[6]) JL_NOTSAFEPOINT
 {
     uint64_t lcg = src[4];                // load internal PCG's LCG state
     uint64_t dot = src[5] + pcg_out(lcg); // update splitmix dot product
-    uint64_t mul = pcg_out(dot) | 1;      // state multiplier (odd ∴ invertible)
-    dst[0] = mul * src[1]; // we multiply here because:
-    dst[1] = mul * src[2]; // 1. guarantees not accidentally hitting all zeros state
-    dst[2] = mul * src[3]; // 2. multiply is fairly non-commutive with ops xoshiro
-    dst[3] = mul * src[0]; //    stepping uses so the result should be uncorrelated
     dst[4] = src[4] = lcg * LCG_MUL + 1;  // LCG advances in both child and parent
     dst[5] = dot;                         // dot product modified in child only
+    // use dot as a PCG state to seed the xoshiro256 registers:
+    dst[0] = pcg_out(dot = dot * LCG_MUL + 1);
+    dst[1] = pcg_out(dot = dot * LCG_MUL + 1);
+    dst[2] = pcg_out(dot = dot * LCG_MUL + 1);
+    dst[3] = pcg_out(dot = dot * LCG_MUL + 1);
+    // since the PCG state and output are the same size, the outputs must all be
+    // distinct, which guarantees that the xoshiro256 state cannot be all zeros
 }
 
 JL_DLLEXPORT jl_task_t *jl_new_task(jl_function_t *start, jl_value_t *completion_future, size_t ssize)
