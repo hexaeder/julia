@@ -3,6 +3,9 @@ BUILDDIR := .
 JULIAHOME := $(abspath $(SRCDIR)/..)
 include $(JULIAHOME)/Make.inc
 
+# import LLVM_SHARED_LIB_NAME
+include $(JULIAHOME)/deps/llvm-ver.make
+
 TAGGED_RELEASE_BANNER := ""
 
 all: $(addprefix $(BUILDDIR)/,pcre_h.jl errno_h.jl build_h.jl.phony features_h.jl file_constants.jl uv_constants.jl version_git.jl.phony)
