@@ -116,8 +116,7 @@ rng_native_52(::TaskLocalRNG) = UInt64
 function setstate!(
     x::TaskLocalRNG,
     s0::UInt64, s1::UInt64, s2::UInt64, s3::UInt64, # xoshiro256 state
-    s4::UInt64 = hash((s0, s1)), # splitmix weight rng state
-    s5::UInt64 = hash((s2, s3)), # splitmix dot product
+    s4::UInt64 = hash((s0, s1, s2, s3)), # splitmix weight rng state
 )
     t = current_task()
     t.rngState0 = s0
@@ -125,7 +124,6 @@ function setstate!(
     t.rngState2 = s2
     t.rngState3 = s3
     t.rngState4 = s4
-    t.rngState5 = s5
     x
 end
 

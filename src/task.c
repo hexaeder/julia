@@ -866,36 +866,34 @@ uint64_t jl_genrandom(uint64_t rngState[4]) JL_NOTSAFEPOINT
     return res;
 }
 
-// pcg_out = pcg_output_rxs_m_xs_64_64 from
-// https://github.com/imneme/pcg-c/blob/83252d9c23df9c82ecb42210afed61a7b42402d7/include/pcg_variants.h#L188-L193
-//
-// This is the best statistical output function of the PCG family; it produces
-// statistically good output even in the case when the state and output are the
-// same size, in this case both being 64 bits.
-//
-inline uint64_t pcg_out(uint64_t x)
+void jl_rng_split(uint64_t dst[JL_RNG_SIZE], uint64_t src[JL_RNG_SIZE])
 {
-    int s = x >> 59;
-    x ^= x >> (s + 5);
-    x *= 0xaef17502108ef2d9;
-    return x ^ (x >> 43);
-}
+    // load and advance PCG's LCG state
+    uint64_t x = src[4];
+    src[4] = dst[4] = x * 0xd1342543de82ef95 + 1;
+    // high spectrum multiplier from https://arxiv.org/abs/2001.05304
 
-const uint64_t LCG_MUL = 0xd1342543de82ef95; // https://arxiv.org/abs/2001.05304
+    static const uint64_t a[4] = {
+        0xe5f8fa077b92a8a8, // random additive offsets...
+        0x7a0cd918958c124d,
+        0x86222f7d388588d4,
+        0xd30cbd35f2b64f52
+    };
+    static const uint64_t m[4] = {
+        0xaef17502108ef2d9, // standard multiplier
+        0xf34026eeb86766af, // random odd multipliers...
+        0x38fd70ad58dd9fbb,
+        0x6677f9b93ab0c04d
+    };
 
-void jl_rng_split(uint64_t dst[6], uint64_t src[6]) JL_NOTSAFEPOINT
-{
-    uint64_t lcg = src[4];                // load internal PCG's LCG state
-    uint64_t dot = src[5] + pcg_out(lcg); // update splitmix dot product
-    dst[4] = src[4] = lcg * LCG_MUL + 1;  // LCG advances in both child and parent
-    dst[5] = dot;                         // dot product modified in child only
-    // use dot as a PCG state to seed the xoshiro256 registers:
-    dst[0] = pcg_out(dot = dot * LCG_MUL + 1);
-    dst[1] = pcg_out(dot = dot * LCG_MUL + 1);
-    dst[2] = pcg_out(dot = dot * LCG_MUL + 1);
-    dst[3] = pcg_out(dot = dot * LCG_MUL + 1);
-    // since the PCG state and output are the same size, the outputs must all be
-    // distinct, which guarantees that the xoshiro256 state cannot be all zeros
+    // PCG-RXS-M-XS output with four variants
+    for (int i = 0; i < 4; i++) {
+        uint64_t p = x + a[i];
+        p ^= p >> ((p >> 59) + 5);
+        p *= m[i];
+        p ^= p >> 43;
+        dst[i] = src[i] + p; // SplitMix dot product
+    }
 }
 
 JL_DLLEXPORT jl_task_t *jl_new_task(jl_function_t *start, jl_value_t *completion_future, size_t ssize)
