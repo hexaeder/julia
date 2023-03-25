@@ -327,3 +327,25 @@ end
     @test_throws ArgumentError @macroexpand(@threads 1) # arg isn't an Expr
     @test_throws ArgumentError @macroexpand(@threads if true 1 end) # arg doesn't start with for
 end
+
+using Random
+
+@testset "RNG: child doesn't affect parent" begin
+    seeds = rand(UInt64, 5)
+    for seed in seeds
+        Random.seed!(seed)
+        x = rand(UInt64)
+        y = rand(UInt64)
+        for n = 1:5
+            Random.seed!(seed)
+            @sync for i = 1:n
+                @async rand(UInt64)
+            end
+            @test x == rand(UInt64)
+            @sync for i = 1:n
+                @async rand(UInt64)
+            end
+            @test y == rand(UInt64)
+        end
+    end
+end
