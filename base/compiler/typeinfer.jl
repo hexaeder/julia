@@ -902,7 +902,7 @@ function typeinf_edge(interp::AbstractInterpreter, method::Method, @nospecialize
     end
     if !is_cached(caller) && frame_parent(caller) === nothing
         # this caller exists to return to the user
-        # (if we asked; resolve_call_cycle!, it might instead detect that there is a cycle that it can't merge)
+        # (if we asked resolve_call_cycle!, it might instead detect that there is a cycle that it can't merge)
         frame = false
     else
         frame = resolve_call_cycle!(interp, mi, caller)
